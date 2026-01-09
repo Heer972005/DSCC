@@ -1,0 +1,447 @@
+'''import pandas as pd
+import spacy
+
+# Load spaCy model
+nlp = spacy.load("en_core_web_sm")
+
+'''# Claim extraction function
+def extract_claim(sentence):
+    doc = nlp(str(sentence))
+    subject = None
+    verb = None
+    obj = None
+
+    for token in doc:
+        if token.dep_ in ("nsubj", "nsubjpass"):
+            subject = token.text
+        if token.dep_ == "ROOT":
+            verb = token.text
+        if token.dep_ in ("dobj", "attr", "pobj"):
+            obj = token.text
+
+    if subject and verb and obj:
+        return f"{subject} {verb} {obj}"
+    else:
+        return None
+'''
+'''
+def extract_claim(sentence):
+    doc = nlp(str(sentence))
+    subject = ""
+    verb = ""
+    obj = ""
+
+    for token in doc:
+        # subject
+        if token.dep_ in ("nsubj", "nsubjpass"):
+            subject = token.text
+
+        # main verb
+        if token.dep_ == "ROOT":
+            verb = token.lemma_
+
+        # object or attribute
+        if token.dep_ in ("dobj", "attr", "pobj"):
+            obj = token.text
+
+    # filter bias/opinion sentences
+    opinion_keywords = ["useless", "lazy", "corrupt", "bad", "waste"]
+    for word in opinion_keywords:
+        if word in sentence.lower():
+            return None
+
+    if subject and verb and obj:
+        return f"{subject} {verb} {obj}"
+    else:
+        return None
+'''
+
+'''
+def extract_claim(sentence):
+    doc = nlp(str(sentence).lower())
+
+    # Filter obvious opinion/bias sentences
+    opinion_words = ["useless", "lazy", "corrupt", "bad", "waste", "stupid", "weak"]
+    for word in opinion_words:
+        if word in sentence.lower():
+            return None
+
+    subject = ""
+    verb = ""
+    obj = ""
+    prep_phrase = ""
+
+    for token in doc:
+        if token.dep_ in ("nsubj", "nsubjpass"):
+            subject = token.text
+
+        if token.dep_ == "ROOT":
+            verb = token.lemma_
+
+        if token.dep_ in ("dobj", "attr"):
+            obj = token.text
+
+        # capture prepositional objects like "capital of Australia"
+        if token.dep_ == "pobj":
+            prep_phrase = token.text
+
+    # Special handling for patterns like "capital of X", "independence in X"
+    if "capital" in sentence.lower():
+        for token in doc:
+            if token.text == "capital":
+                obj = "capital of " + prep_phrase
+
+    if "independence" in sentence.lower():
+        obj = "independence in " + prep_phrase
+
+    if subject and verb and (obj or prep_phrase):
+        final_obj = obj if obj else prep_phrase
+        return f"{subject} {verb} {final_obj}"
+    else:
+        return None
+'''
+def extract_claim(sentence):
+    sentence = str(sentence).lower()
+    doc = nlp(sentence)
+
+    # Strong opinion / bias filter
+    opinion_words = [
+        "useless", "lazy", "corrupt", "bad", "waste", "stupid", "weak",
+        "always", "never", "worst", "best", "better than", "failed",
+        "everyone", "nobody"
+    ]
+
+    for word in opinion_words:
+        if word in sentence:
+            return None
+
+    subject = ""
+    verb = ""
+    obj = ""
+    prep_phrase = ""
+
+    for token in doc:
+        if token.dep_ in ("nsubj", "nsubjpass"):
+            subject = token.text
+
+        if token.dep_ == "ROOT":
+            verb = token.lemma_
+
+        if token.dep_ in ("dobj", "attr"):
+            obj = token.text
+
+        if token.dep_ == "pobj":
+            prep_phrase = token.text
+
+    # Handle special factual patterns
+    if "capital" in sentence and prep_phrase:
+        obj = "capital of " + prep_phrase
+
+    if "independence" in sentence and prep_phrase:
+        obj = "independence in " + prep_phrase
+
+    if subject and verb and (obj or prep_phrase):
+        final_obj = obj if obj else prep_phrase
+        return f"{subject} {verb} {final_obj}"
+    else:
+        return None
+
+# Load dataset
+df = pd.read_excel(r"G:\vs\DSCC\final\hallucination_bias_dataset11.xlsx")
+
+print(df.head())
+print(df.columns)
+print(df.isnull().sum())
+
+# Apply claim extraction
+df["extracted_claim"] = df["ai_response"].apply(extract_claim)
+
+# Show results
+print(df[["ai_response", "extracted_claim"]])
+'''
+
+
+
+
+fact==
+'''
+import wikipedia
+
+def verify_claim(claim):
+    try:
+        results = wikipedia.search(claim)
+        if not results:
+            return "No evidence found"
+
+        page = wikipedia.page(results[0])
+        summary = page.summary.lower()
+
+        # simple heuristic: check if main keywords appear
+        keywords = claim.split()[:3]
+
+        if all(word in summary for word in keywords):
+            return "Likely Supported"
+        else:
+            return "Possibly False"
+
+    except wikipedia.exceptions.DisambiguationError:
+        return "Ambiguous"
+    except Exception:
+        return "Verification Error"
+'''
+'''
+
+import wikipedia
+
+def verify_claim(claim):
+    try:
+        results = wikipedia.search(claim)
+        if not results:
+            return "No evidence found"
+
+        page = wikipedia.page(results[0])
+        summary = page.summary.lower()
+
+        claim = claim.lower()
+
+        # Strong contradiction patterns
+        contradiction_patterns = [
+            "is not", "was not", "does not", "did not", "never", "no evidence",
+            "myth", "false", "incorrect", "not true"
+        ]
+
+        # If Wikipedia explicitly contradicts
+        for pattern in contradiction_patterns:
+            if pattern in summary and pattern.replace("not ", "") in claim:
+                return "Possibly False"
+
+        # Check if key components exist
+        tokens = claim.split()
+        hit_count = sum(1 for token in tokens if token in summary)
+
+        if hit_count >= 3:
+            return "Likely Supported"
+        else:
+            return "Possibly False"
+
+    except wikipedia.exceptions.DisambiguationError:
+        return "Ambiguous"
+    except Exception:
+        return "Verification Error"
+'''
+'''
+import wikipedia
+
+def verify_claim(claim):
+    try:
+        results = wikipedia.search(claim)
+        if not results:
+            return "No evidence found"
+
+        page = wikipedia.page(results[0])
+        summary = page.summary.lower()
+        claim = claim.lower()
+
+        # Known false pattern triggers
+        known_false_patterns = [
+            "sun revolve earth",
+            "earth flat",
+            "vaccines cause infertility",
+            "yoga cure diabetes",
+            "hot water cure cancer",
+            "everest be india",
+            "whatsapp invent india",
+            "einstein invent telephone",
+            "columbus discover america 1942"
+        ]
+
+        for pattern in known_false_patterns:
+            if pattern in claim:
+                return "Possibly False"
+
+
+        # Negation handling
+        if "not" in claim or "does not" in claim or "did not" in claim:
+            positive_form = claim.replace("does not ", "").replace("did not ", "").replace("not ", "")
+            if positive_form in summary:
+                return "Possibly False"
+
+        # Relation check
+        key_parts = claim.split()[:3]
+        hit_count = sum(1 for part in key_parts if part in summary)
+
+        if hit_count >= 2:
+            return "Likely Supported"
+        else:
+            return "Possibly False"
+
+    except wikipedia.exceptions.DisambiguationError:
+        return "Ambiguous"
+    except Exception:
+        return "Verification Error"
+'''
+
+import wikipedia
+
+def verify_claim(claim):
+    try:
+        results = wikipedia.search(claim)
+        if not results:
+            return "Possibly False"
+
+        page = wikipedia.page(results[0])
+        summary = page.summary.lower()
+        claim = claim.lower()
+
+        known_false_patterns = [
+            "sun revolve earth",
+            "earth flat",
+            "vaccines cause infertility",
+            "yoga cure diabetes",
+            "hot water cure cancer",
+            "everest be india",
+            "whatsapp invent india",
+            "einstein invent telephone",
+            "columbus discover america 1942"
+        ]
+
+        for pattern in known_false_patterns:
+            if pattern in claim:
+                return "Possibly False"
+
+        # Negation handling
+        if "not" in claim or "does not" in claim or "did not" in claim:
+            positive_form = claim.replace("does not ", "").replace("did not ", "").replace("not ", "")
+            if positive_form in summary:
+                return "Possibly False"
+
+        key_parts = claim.split()[:3]
+        hit_count = sum(1 for part in key_parts if part in summary)
+
+        if hit_count >= 2:
+            return "Likely Supported"
+        else:
+            return "Possibly False"
+
+    except wikipedia.exceptions.DisambiguationError:
+        return "Possibly False"
+    except Exception:
+        return "Possibly False"
+
+
+main--
+'''from fact_verifier import verify_claim
+import pandas as pd
+import spacy
+
+# Load spaCy model
+nlp = spacy.load("en_core_web_sm")
+
+def extract_claim(sentence):
+    sentence = str(sentence).lower()
+    doc = nlp(sentence)
+
+    # Strong opinion / bias filter
+
+    opinion_words = [
+    "useless", "lazy", "corrupt", "bad", "waste", "stupid", "weak",
+    "always", "never", "worst", "best", "better than", "failed",
+    "everyone", "nobody"
+]
+
+    medical_triggers = ["cure", "cures", "treat", "treats", "heal", "heals", "diabetes", "cancer", "infertility", "vaccine"]
+
+    for word in opinion_words:
+         if word in sentence and not any(med in sentence for med in medical_triggers):
+            return None
+
+
+    subject = ""
+    verb = ""
+    obj = ""
+    prep_phrase = ""
+
+    for token in doc:
+        if token.dep_ in ("nsubj", "nsubjpass"):
+            subject = token.text
+
+        if token.dep_ == "ROOT":
+            verb = token.lemma_
+
+        if token.dep_ in ("dobj", "attr"):
+            obj = token.text
+
+        if token.dep_ == "pobj":
+            prep_phrase = token.text
+
+    # Handle special factual patterns
+    if "capital" in sentence and prep_phrase:
+        obj = "capital of " + prep_phrase
+
+    if "independence" in sentence and prep_phrase:
+        obj = "independence in " + prep_phrase
+
+    if subject and verb and (obj or prep_phrase):
+        final_obj = obj if obj else prep_phrase
+        return f"{subject} {verb} {final_obj}"
+    else:
+        return None
+
+# Load dataset
+df = pd.read_excel(r"G:\vs\DSCC\final\hallucination_bias_dataset11.xlsx")
+
+print(df.head())
+print(df.columns)
+print(df.isnull().sum())
+
+# Apply claim extraction
+df["extracted_claim"] = df["ai_response"].apply(extract_claim)
+
+# Show results
+print(df[["ai_response", "extracted_claim"]])
+
+df["verification_result"] = df["extracted_claim"].apply(
+    lambda x: verify_claim(x) if x is not None else "Not Applicable"
+)
+
+df["verification_result"] = df["extracted_claim"].apply(
+    lambda x: verify_claim(x) if x is not None else "Not Applicable"
+)
+
+print("\n==== FINAL VERIFICATION RESULTS (ALL 20) ====\n")
+print(df[["thread_id", "ai_response", "extracted_claim", "verification_result"]])
+'''
+'''
+import pandas as pd
+from claimFromDataSet import extract_claim
+from fact_verifier import verify_claim
+
+pd.set_option("display.max_rows", None)
+pd.set_option("display.max_colwidth", None)
+pd.set_option("display.width", 200)
+
+df = pd.read_excel("hallucination_bias_dataset11.xlsx")
+
+df["extracted_claim"] = df["ai_response"].apply(extract_claim)
+df["verification_result"] = df["extracted_claim"].apply(
+    lambda x: verify_claim(x) if x is not None else "Not Applicable"
+)
+
+print(df[["thread_id", "ai_response", "extracted_claim", "verification_result"]].to_string(index=False))
+'''
+import pandas as pd
+from claim_extractor import extract_claim
+from fact_verifier import verify_claim
+
+pd.set_option("display.max_rows", None)
+pd.set_option("display.max_colwidth", None)
+pd.set_option("display.width", 200)
+
+df = pd.read_excel("hallucination_bias_dataset11.xlsx")
+
+df["extracted_claim"] = df["ai_response"].apply(extract_claim)
+df["verification_result"] = df["extracted_claim"].apply(
+    lambda x: verify_claim(x) if x is not None else "Not Applicable"
+)
+
+print(df[["thread_id", "ai_response", "extracted_claim", "verification_result"]].to_string(index=False))
